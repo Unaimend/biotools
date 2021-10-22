@@ -2,3 +2,11 @@
 .Rhistory
 .RData
 .Ruserdata
+
+src/biotools/tetra
+
+tests/test1
+
+log
+
+pca/pca\.Rproj
