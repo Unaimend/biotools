@@ -148,27 +148,6 @@ proc countAllFreqs(sequences: seq[Sequence], normalized:bool=false): OrderedTabl
           output[seq.id].add($normalized_value & ",")
   output
 
-proc count_gc_content*(sequence: string):float=
-  var count: int = 0
-  for c in sequence:
-    if c == 'G' or c == 'C':
-      count = count + 1
-  return count/len(sequence)
-
-
-proc gc_content(sequences: seq[Sequence]): OrderedTable[string, string]=
-  var output: OrderedTable[string, string]
-  var header_flag = true 
-  for seq in sequences:
-    var count = count_gc_content($seq.data)
-    if header_flag:
-      var head_str = ""
-      output["id"] = ""
-      output["id"].add("GC"  )
-      header_flag = false
-    output[seq.id] = ""
-    output[seq.id].add($count)
-  output
 
 
 when isMainModule:
