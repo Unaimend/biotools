@@ -68,6 +68,9 @@ proc countTetraNucleotideReversed*(sequence: string):OrderedTable[string, int]=
   let tetras = countKmers(sequence, 4)
   var freqs = generateFreqTableRev()
   for k,v in tetras:
+    if 'N' in k:
+      echo "was"
+      continue
     if k in freqs:
       freqs[k] += v
     else:
@@ -101,7 +104,7 @@ proc countAllFreqs*(sequences: seq[string]): Table[string, string]=
       output[seq].add($v & ",")
   output
 
-proc countFreqs*(sequences: seq[string]): Table[string, string]=
+proc countFreqs(sequences: seq[string]): Table[string, string]=
   var output: Table[string, string]
   var header_flag = true 
   for seq in sequences:
@@ -184,6 +187,7 @@ proc countSliding(whole_file: string, reversed=false): OrderedTable[string, stri
         if index == 127:
           index = index + 1
           output["id"].add(key)
+          index=0
         else:
           index = index + 1
           output["id"].add(key & ",")
@@ -191,8 +195,8 @@ proc countSliding(whole_file: string, reversed=false): OrderedTable[string, stri
     output[$i] = ""
     for k,v in t:
       if index == 127:
-        echo "CALLED"
         index += 1
+        index=0
         output[$i].add($v)
       else:
         index += 1
