@@ -38,10 +38,10 @@ proc permutations[T](a: openarray[T], n: int): seq[seq[T]] =
 
 
 #REVERSE BULLSHIT INCLUDED
-proc generateFreqTableSTUFF() : Table[string, int]=
+proc generateFreqTableRev() : OrderedTable[string, int]=
   ### ttps://forum.nim-lang.org/t/2812 CREDITS
   var test1:seq[seq[char]] = repeatedPermutations("ACTG", 4)
-  var test: Table[string, int]
+  var test: OrderedTable[string, int]
   for v in test1:
     var c: string = $complement(v.map(toNucleotide)) 
     var v2 = v.join("")
@@ -49,7 +49,7 @@ proc generateFreqTableSTUFF() : Table[string, int]=
       continue
     else:
       test[v2] = 0
-  echo test
+  #echo test
   test
 
 proc generateFreqTable() : OrderedTable[string, int]=
@@ -63,6 +63,16 @@ proc generateFreqTable() : OrderedTable[string, int]=
 proc countTetraNucleotide*(sequence: string):CountTable[string]=
   let tetras = countKmers(sequence, 4)
   tetras
+
+proc countTetraNucleotideReversed*(sequence: string):OrderedTable[string, int]=
+  let tetras = countKmers(sequence, 4)
+  var freqs = generateFreqTableRev()
+  for k,v in tetras:
+    if k in freqs:
+      freqs[k] += v
+    else:
+      freqs[$(k.toNucleotide.complement)] += v
+  freqs 
 
 proc countTetraNucleotideAll*(sequence: string):OrderedTable[string, int]=
   let tetras = countKmers(sequence, 4)
@@ -148,24 +158,70 @@ proc countAllFreqs(sequences: seq[Sequence], normalized:bool=false): OrderedTabl
           output[seq.id].add($normalized_value & ",")
   output
 
+proc countSliding(whole_file: string, reversed=false): OrderedTable[string, string] =
+  let size=3000 
+  let amount_slid_windows = int(len(whole_file)/size)
+  let amount_left = len(whole_file) mod size 
+  #echo amount_left
+  #echo amount_slid_windows
+  #echo len(whole_file)
+  
+  var output: OrderedTable[string, string]
 
+  var header_flag=true
+  #var test_str = ""
+  output["id"] = ""
+  for i in countup(0, amount_slid_windows-1, 1):
+    let window = whole_file[i*size .. (i+1)*size-1]
+    var t: OrderedTable[string, int]
+    if reversed:
+      t  = countTetraNucleotideReversed(window)
+    else:
+      t  = countTetraNucleotideAll(window)
+    var index = 0
+    if header_flag:
+      for key, val in t:
+        if index == 127:
+          index = index + 1
+          output["id"].add(key)
+        else:
+          index = index + 1
+          output["id"].add(key & ",")
+      header_flag = false
+    output[$i] = ""
+    for k,v in t:
+      if index == 127:
+        echo "CALLED"
+        index += 1
+        output[$i].add($v)
+      else:
+        index += 1
+        output[$i].add($v & ",")
+
+    #test_str.add(window)
+  #ADD OPTION OT INCLUDE OVERLAPP
+  let overlap_str: string = whole_file[amount_slid_windows*size ..  (amount_slid_windows*size)+amount_left-1]
+  output
 
 when isMainModule:
   var p = newParser:
     option("-i", "--input", help="Comma separated list of input FASTA files")
     flag("-s", "--sliding", help="Comma separated list of input FASTA files")
+    flag("-r", "--reversed", help="Comma separated list of input FASTA files")
     option("-o", "--output", help="Folder where to output")
 
   let args: seq[string] = commandLineParams()
   var files: seq[string]
   var oFolder: string
   var sliding: bool
+  var reversed: bool = false
 
   try:
     var opts = p.parse(args)
     files = opts.input.split(',')
     sliding = opts.sliding
     oFolder = opts.output
+    reversed = opts.reversed
   except ShortCircuit as e:
     if e.flag == "argparse_help":
       echo p.help 
@@ -184,44 +240,11 @@ when isMainModule:
       var whole_file = ""
       for seq in fasta.seqs:
         whole_file.add($(seq.data))
-      let size=3000
-      let amount_slid_windows = int(len(whole_file)/size)
-
-      let amount_left = len(whole_file) mod size 
-      echo amount_left
-      echo amount_slid_windows
-      echo len(whole_file)
-      
-      var output: OrderedTable[string, string]
-      var header_flag=true
-      #var test_str = ""
-      output["id"] = ""
-      for i in countup(0, amount_slid_windows-1, 1):
-        let window = whole_file[i*size .. (i+1)*size-1]
-        var t  = countTetraNucleotideAll(window)
-        var index = 0
-        if header_flag:
-          for key, val in t:
-            if index == 255:
-              index = index + 1
-              output["id"].add(key)
-            else:
-              index = index + 1
-              output["id"].add(key & ",")
-          header_flag = false
-        output[$i] = ""
-        for k,v in t:
-          if index == 255:
-            index += 1
-            output[$i].add($v)
-          else:
-            index += 1
-            output[$i].add($v & ",")
-
-        #test_str.add(window)
-      #ADD OPTION OT INCLUDE OVERLAPP
-      let overlap_str: string = whole_file[amount_slid_windows*size ..  (amount_slid_windows*size)+amount_left-1]
-      output.to_csv(f & ".csv")
+      var output = whole_file.countSliding(reversed)
+      if reversed:
+        output.to_csv(f & ".reversed.csv")
+      else:
+        output.to_csv(f & ".csv")
       
       #test_str.add(overlap_str)
       #echo test_str == whole_file
