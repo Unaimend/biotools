@@ -33,6 +33,8 @@ proc gc_content(sequences: seq[Sequence]): OrderedTable[string, string]=
   #f.close() 
   output
 
+
+
 proc countSliding(whole_file: string): OrderedTable[string, string] =
   let size=3000
   let amount_slid_windows = int(len(whole_file)/size)
@@ -51,6 +53,25 @@ proc countSliding(whole_file: string): OrderedTable[string, string] =
       header_flag = false
     var v =  $count_gc_content(window)
     output[$i] =  v
+  output
+
+
+proc countAllFreqsSplit(sequences: seq[Sequence], normalized:bool=false, reversed:bool = false): OrderedTable[tuple[id: string, sub: string], string]=
+  var output: OrderedTable[tuple[id: string, sub: string], string] 
+  var header_flag = true 
+  var sub = 0
+  output[($sub, "contig")] = "GC"
+  for seq in sequences:
+    var count = countSliding($seq.data)
+    var beg = true
+    for k,v in count:
+      if beg == true:
+        # because v does include a header sequence for every #
+        # sequence we skip the first dic entry for every sequence which is the header line
+        beg = false
+        continue
+      output[($sub, seq.id)] = v
+      sub += 1
   output
 
 when isMainModule:
@@ -78,8 +99,11 @@ when isMainModule:
     let fasta = parseFastaFile(f)
     echo "FINISHED PARSING SEQUENCES"
     var whole_file = ""
+    
     for seq in fasta.seqs:
       whole_file.add($(seq.data))
 
-    var gc = count_sliding(whole_file)
+    var gc = countAllFreqsSplit(fasta.seqs)
+    #(fasta.seqs)
+    #var gc = count_sliding(whole_file)
     gc.to_csv(f & ".gc.csv")

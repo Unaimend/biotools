@@ -69,7 +69,6 @@ proc countTetraNucleotideReversed*(sequence: string):OrderedTable[string, int]=
   var freqs = generateFreqTableRev()
   for k,v in tetras:
     if 'N' in k:
-      echo "was"
       continue
     if k in freqs:
       freqs[k] += v
@@ -81,6 +80,8 @@ proc countTetraNucleotideAll*(sequence: string):OrderedTable[string, int]=
   let tetras = countKmers(sequence, 4)
   var freqs = generateFreqTable()
   for k,v in tetras:
+    if 'N' in k:
+      continue
     freqs[k] = v
   freqs 
 
@@ -103,6 +104,54 @@ proc countAllFreqs*(sequences: seq[string]): Table[string, string]=
     for k,v in count:
       output[seq].add($v & ",")
   output
+
+proc countSliding(whole_file: string, reversed=false): OrderedTable[string, string] =
+  let size=3000 
+  let amount_slid_windows = int(len(whole_file)/size)
+  let amount_left = len(whole_file) mod size 
+  #echo amount_left
+  #echo amount_slid_windows
+  #echo len(whole_file)
+  
+  var output: OrderedTable[string, string]
+
+  var header_flag=true
+  #var test_str = ""
+  output["id"] = ""
+  for i in countup(0, amount_slid_windows-1, 1):
+    let window = whole_file[i*size .. (i+1)*size-1]
+    var t: OrderedTable[string, int]
+    if reversed:
+      t  = countTetraNucleotideReversed(window)
+    else:
+      t  = countTetraNucleotideAll(window)
+    var index = 0
+    if header_flag:
+      for key, val in t:
+        if index == (if reversed: 127 else: 255):
+          index = index + 1
+          output["id"].add(key)
+          index=0
+        else:
+          index = index + 1
+          output["id"].add(key & ",")
+      header_flag = false
+    output[$i] = ""
+    for k,v in t:
+      if index ==  (if reversed: 127 else: 255):
+        index += 1
+        index=0
+        output[$i].add($v)
+      else:
+        index += 1
+        output[$i].add($v & ",")
+
+    #test_str.add(window)
+  #ADD OPTION OT INCLUDE OVERLAPP
+  let overlap_str: string = whole_file[amount_slid_windows*size ..  (amount_slid_windows*size)+amount_left-1]
+  output
+
+
 
 proc countFreqs(sequences: seq[string]): Table[string, string]=
   var output: Table[string, string]
@@ -161,51 +210,32 @@ proc countAllFreqs(sequences: seq[Sequence], normalized:bool=false): OrderedTabl
           output[seq.id].add($normalized_value & ",")
   output
 
-proc countSliding(whole_file: string, reversed=false): OrderedTable[string, string] =
-  let size=3000 
-  let amount_slid_windows = int(len(whole_file)/size)
-  let amount_left = len(whole_file) mod size 
-  #echo amount_left
-  #echo amount_slid_windows
-  #echo len(whole_file)
-  
-  var output: OrderedTable[string, string]
-
-  var header_flag=true
-  #var test_str = ""
-  output["id"] = ""
-  for i in countup(0, amount_slid_windows-1, 1):
-    let window = whole_file[i*size .. (i+1)*size-1]
-    var t: OrderedTable[string, int]
-    if reversed:
-      t  = countTetraNucleotideReversed(window)
-    else:
-      t  = countTetraNucleotideAll(window)
-    var index = 0
-    if header_flag:
-      for key, val in t:
-        if index == 127:
-          index = index + 1
-          output["id"].add(key)
-          index=0
-        else:
-          index = index + 1
-          output["id"].add(key & ",")
-      header_flag = false
-    output[$i] = ""
-    for k,v in t:
-      if index == 127:
-        index += 1
-        index=0
-        output[$i].add($v)
-      else:
-        index += 1
-        output[$i].add($v & ",")
-
-    #test_str.add(window)
-  #ADD OPTION OT INCLUDE OVERLAPP
-  let overlap_str: string = whole_file[amount_slid_windows*size ..  (amount_slid_windows*size)+amount_left-1]
+proc countAllFreqsSplit(sequences: seq[Sequence], normalized:bool=false, reversed:bool = false): OrderedTable[tuple[id: string, sub: string], string]=
+  var output: OrderedTable[tuple[id: string, sub: string], string] 
+  var header_flag = true 
+  var sub = 0
+  for seq in sequences:
+    var count = countSliding($seq.data, reversed)
+    var beg = true
+    for k,v in count:
+      echo v
+      if header_flag:
+        # Addd header to output
+        output[($sub, "contig")] = v[0 .. (len(v)-1) ]
+        header_flag = false
+        # Skip to next interation so we do not add header twice
+        continue
+      if beg == true:
+        # because v does include a header sequence for every sequence we skip the first dic entry for every sequence which is the header line
+        beg = false
+        continue
+       
+      output[($sub, seq.id)] = v
+      sub += 1
   output
+    
+
+
 
 when isMainModule:
   var p = newParser:
@@ -238,7 +268,7 @@ when isMainModule:
     let fasta = parseFastaFile(f)
     if not sliding:
       echo "FINISHED PARSING SEQUENCES"
-      var freqs =  countAllFreqs(fasta.seqs, true)
+      var freqs =  countAllFreqsSplit(fasta.seqs, false)
       freqs.to_csv(f & ".csv")
     else:
       var whole_file = ""
